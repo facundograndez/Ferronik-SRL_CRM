@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+coverage/
+.vercel/
+.env
+.env.local
+.env.*.local
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+generated/prisma/
+.skill-staging/
+.skill-validation-deps/
