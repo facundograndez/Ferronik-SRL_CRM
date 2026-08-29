@@ -43,7 +43,7 @@ src/
     ui/                      # primitives del design system
     shared/
   modules/
-    identity/ catalog/ pricing/ inventory/ crm/ sales/
+    identity/ catalog/ pricing/ inventory/ crm/ sales/ logistics/
     procurement/ production/ ledger/ treasury/ fiscal/
     channels/ documents/ reporting/ notifications/ audit/
       domain/                # entidades, value objects, políticas
@@ -67,6 +67,8 @@ docs/
 - Errores tipados: validation, unauthorized, forbidden, conflict, not-found, integration/transient.
 - Toda escritura recibe actor, correlation ID e idempotency key cuando aplique.
 - Fechas de negocio (`date`) se separan de instantes (`timestamptz`).
+- `Money` siempre contiene amount + currency; no se suman monedas diferentes. `ProfitabilitySnapshot` agrega productos, logística, otros ingresos/costos y su estado `PROVISIONAL|FINAL`.
+- Sales es dueño del compromiso comercial y Logistics de la entrega. `SaleDelivery` referencia la venta, pero sus estados no cambian implícitamente el estado comercial o fiscal.
 - `vercel.json` no se crea mientras defaults de framework alcancen.
 
 ## Consistencia y asincronía
@@ -83,3 +85,6 @@ docs/
 - ADR-003: sesiones opacas persistidas, no JWT auto-contenido como fuente de autorización.
 - ADR-004: ledger y movimientos append-only.
 - ADR-005: adapters para ARCA, Mercado Libre, Meta, FX y storage.
+- ADR-006: logística de venta modelada, no un campo genérico; cargo, costo, fiscalidad, dirección y estados poseen integridad y snapshots.
+- ADR-007: subledgers por moneda; equivalentes consolidados son proyecciones informativas, nunca saldo fuente.
+- ADR-008: rentabilidad histórica versionada y explícitamente provisional o final.

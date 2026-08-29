@@ -18,6 +18,7 @@ erDiagram
   USER }o--o{ PERMISSION : overrides
   CUSTOMER ||--o{ QUOTE : requests
   CUSTOMER ||--o{ SALE : buys
+  CUSTOMER ||--o{ SALE_DELIVERY : receives
   CUSTOMER ||--|| CUSTOMER_ACCOUNT : has
   PRODUCT ||--o{ PRODUCT_VARIANT : groups
   PRODUCT_VARIANT ||--o{ UNIT_CONVERSION : converts
@@ -25,6 +26,10 @@ erDiagram
   PRODUCT_VARIANT ||--o{ INVENTORY_MOVEMENT : moves
   WAREHOUSE ||--o{ INVENTORY_MOVEMENT : records
   SALE ||--|{ SALE_ITEM : contains
+  SALE ||--o| SALE_DELIVERY : fulfills
+  SALE_DELIVERY }o--o| CARRIER : handled_by
+  SALE_DELIVERY ||--o{ SHIPPING_COST_REVISION : revises
+  SALE ||--|{ PROFITABILITY_SNAPSHOT : calculates
   SALE ||--o{ PAYMENT_ALLOCATION : paid_by
   SALE ||--o{ STOCK_RESERVATION : reserves
   SALE ||--o{ STOCKPILE : creates
@@ -59,7 +64,11 @@ erDiagram
 
 ### Ventas y CRM
 
-`customers`, `customer_contacts`, `quotes`, `quote_items`, `crm_activities`, `sales`, `sale_items`, `sale_adjustments`, `commissions`, `delivery_notes`, `receipts`, `payments`, `payment_allocations`. Líneas guardan neto, impuesto, total, costo, factor fiscal/comercial, conversión, FX y regla de redondeo.
+`customers`, `customer_contacts`, `quotes`, `quote_items`, `crm_activities`, `sales`, `sale_items`, `sale_adjustments`, `sale_deliveries`, `carriers`, `shipping_cost_revisions`, `profitability_snapshots`, `commissions`, `delivery_notes`, `receipts`, `payments`, `payment_allocations`.
+
+Las líneas guardan neto, impuesto, total, costo, factor fiscal/comercial, conversión, FX y regla de redondeo. `sale_deliveries` no es un JSON genérico: contiene `delivery_required`, método, estado, `shipping_charge`, tratamiento fiscal/alícuota snapshot, `shipping_cost`, estado del costo, carrier/provider y notas. La dirección se guarda como columnas snapshot estructuradas (destinatario, calle, número, piso/depto, localidad, provincia, código postal, país y referencias), sin depender de la dirección actual del cliente.
+
+`shipping_cost_revisions` es append-only y conserva costo/estado anterior y nuevo, moneda, actor, instante y motivo. `profitability_snapshots` conserva ingresos/costos de productos, cargo/costo logístico, otros ingresos/costos, total y estado `PROVISIONAL|FINAL`, con versión y causas pendientes.
 
 ### Compras
 
@@ -67,7 +76,9 @@ erDiagram
 
 ### Ledgers y tesorería
 
-`accounts`, `ledger_transactions`, `ledger_entries`, `cash_accounts`, `cash_movements`, `checks`, `expense_obligations`, `expense_payments`, `cross_transfers`. Cada transacción balancea débitos/créditos según el subledger. La transferencia cruzada comparte `operation_id`, afecta ambos subledgers y no crea movimiento de caja.
+`accounts`, `account_currency_ledgers`, `ledger_transactions`, `ledger_entries`, `cash_accounts`, `cash_movements`, `checks`, `expense_obligations`, `expense_payments`, `cross_transfers`. Cada cuenta de cliente/proveedor posee un subledger independiente por moneda. Cada entry conserva `currency`, `amount`, `original_amount`, `original_currency` y `fx_rate_snapshot` cuando hubo conversión. Cada transacción balancea débitos/créditos dentro de la misma moneda/subledger. La transferencia cruzada comparte `operation_id`, afecta ambos subledgers y no crea movimiento de caja.
+
+Una proyección puede mostrar equivalente consolidado a una moneda seleccionada, con tasa/fuente/instante visibles; nunca persiste ni reemplaza los saldos ARS/USD originales.
 
 ### Producción
 
@@ -83,6 +94,12 @@ erDiagram
 - Retiro acumulado de acopio no supera cantidad adquirida.
 - Imputaciones de pago no superan el importe aplicable; saldo a favor es un asiento, no un número manual.
 - Pesos de compra mixta suman exactamente 1.
+- `shipping_charge` y `shipping_cost` son importes distintos, en moneda explícita; nunca se infiere uno del otro.
+- Método `CUSTOMER_PICKUP` no implica automáticamente costo cero: cualquier excepción queda explícita. Si no hay entrega, estado `NOT_REQUIRED` y no existe entrega pendiente.
+- Estado logístico: `NOT_REQUIRED`, `PENDING`, `SCHEDULED`, `PREPARING`, `DISPATCHED`, `DELIVERED`, `CANCELLED`. Estado del costo: `PENDING`, `ESTIMATED`, `FINAL`.
+- Una rentabilidad sólo es `FINAL` cuando envío, liquidación de canal y demás costos significativos están finalizados; de lo contrario es `PROVISIONAL` y enumera causas.
+- Cambiar costo/dirección/datos históricos de entrega crea revisión y AuditLog; nunca sobrescribe silenciosamente el snapshot previo.
+- No se suman ledger entries de monedas distintas para producir un saldo contable único.
 - Un idempotency key es único por actor/integración + operación.
 - Estados se validan con máquinas de estado; no se actualizan libremente.
 - Eliminación física prohibida para operaciones contabilizadas; se anulan/revierten.
@@ -94,6 +111,8 @@ erDiagram
 - Fechas/estado para ventas, compras, cheques, obligaciones, quotes y notificaciones.
 - `(warehouse_id, product_variant_id, occurred_at)` para movimientos.
 - `(account_id, occurred_at, id)` para ledger.
+- `(sale_id)` unique en entrega activa; `(shipping_status, scheduled_at)` y `(carrier_id, delivered_at)` para operación/reportes.
+- `(profitability_status, occurred_at)` y revisiones por `(sale_delivery_id, created_at)`.
 - `(aggregate_type, aggregate_id)` en auditoría/outbox/document links.
 - Índices parciales para sesiones activas, outbox pendiente y alertas abiertas.
 

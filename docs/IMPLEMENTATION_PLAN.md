@@ -8,7 +8,7 @@ Antes de cada fase se publicará: GOAL, ARCHITECTURE, DATABASE CHANGES, FILES TO
 
 ### GOAL
 
-Definir stack, repositorio, límites de dominio, datos, seguridad, deployment, integraciones, testing y roadmap sin desarrollar módulos.
+Definir stack, repositorio, límites de dominio, datos, seguridad, deployment, integraciones, testing y roadmap sin desarrollar módulos. La revisión final incorpora logística de ventas, rentabilidad total/provisional, regla Ferronik de compras mixtas y ledgers multimoneda.
 
 ### ARCHITECTURE
 
@@ -28,6 +28,7 @@ Ninguna. Se diseñó el modelo conceptual; no se creó DB ni migration.
 - Precisión/concurrencia de stock y ledgers requieren integración con PostgreSQL real.
 - Vercel no es un worker persistente: eventos largos necesitan cola/proveedor compatible.
 - Las reglas de comisión, vencimiento y redondeo aún requieren decisiones antes de implementarse.
+- Fiscalidad del cargo de envío y catálogo de costos significativos deben quedar configurables y validarse antes de FASE 6.
 
 ### EXIT
 
@@ -40,14 +41,14 @@ Documentación coherente, trazable al requerimiento y sin afirmar funcionalidad 
 | 1 Foundation | scaffold, CI, DB, auth, sesiones, users/RBAC, audit base, shell/theme, deploy | URL Vercel funcional y acceso seguro |
 | 2 Catálogo | productos, variantes, unidades, listas, Pricing/Unit engines | snapshots y actualización masiva |
 | 3 Inventory | depósitos, movimientos, reservas, acopios | stock concurrente consistente |
-| 4 Customers | ficha, subledger, pagos/imputaciones | CC derivada |
+| 4 Customers | ficha, subledgers ARS/USD, pagos/imputaciones | saldos por moneda; consolidado sólo informativo |
 | 5 Quotes/CRM | pipeline, timeline, PDF/envíos | conversión preparada |
-| 6 Sales | A/B/interna, pricing, comisión, pagos, remitos | operación transaccional |
+| 6 Sales & Logistics | A/B/interna, pricing, comisión, pagos, entrega, cargo/costo logístico, rentabilidad provisional/final y remitos | operación transaccional y snapshots auditables |
 | 7 Procurement | proveedores, compra mixta, NC, cost engine | subledgers fiscal/comercial |
 | 8 Production | BOM, orden, consumos/output | costo snapshot |
 | 9 Treasury | cajas, gastos, cheques, cross-transfer, cash flow | saldos derivados |
 | 10 ARCA | adapter, homologación, CAE, PDF | primero SANDBOX, luego readiness |
-| 11 Mercado Libre | OAuth, sync, fees, rentabilidad, conciliación | snapshots históricos |
+| 11 Mercado Libre | OAuth, sync, fees, cargo/costo logístico por orden, rentabilidad provisional/final, conciliación | snapshots históricos |
 | 12 Meta | WhatsApp/Instagram/Facebook oficiales | historial comunicación |
 | 13 Command Center | KPIs, alertas y reportes | queries autorizadas/performantes |
 | 14 Migration | ETL selectivo legacy | preview/reconcile; sin adaptar core |

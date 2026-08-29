@@ -25,7 +25,7 @@ Los permisos usan `recurso.acción`, se registran en catálogo y se referencian 
 
 ```text
 dashboard.view
-sales.view/create/edit/cancel/viewCost/viewMargin/viewProfitability/overrideReservedStock
+sales.view/create/edit/cancel/viewCost/viewMargin/viewProfitability/viewShippingCost/editShippingCost/viewShippingProfitability/overrideReservedStock
 quotes.view/create/edit/send/convert
 customers.view/create/edit/viewLedger/editLedger
 products.view/create/edit/viewCost/managePrices
@@ -50,6 +50,7 @@ audit.view
 
 - `requirePermission(actor, permission, scope?)` en application layer.
 - Repositorios reciben un query policy para columnas sensibles; no se recuperan y luego se ocultan.
+- Un vendedor puede recibir `shippingCharge` sin `shippingCost`, sus revisiones ni `shippingProfit`. Los serializers/projections server-side aplican `sales.viewShippingCost` y `sales.viewShippingProfitability`; `sales.editShippingCost` controla cada corrección.
 - Descargas usan URLs firmadas sólo tras autorización.
 - Cambios de rol/permisos incrementan `authz_version`; sesiones con versión anterior recalculan o se invalidan.
 - Acciones masivas reevalúan permisos por operación y registran resultado.

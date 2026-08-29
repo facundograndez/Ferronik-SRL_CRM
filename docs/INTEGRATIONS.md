@@ -23,7 +23,7 @@ Contrato: validar datos fiscales, solicitar autorización, consultar estado y re
 
 ## MercadoLibreProvider
 
-OAuth oficial, webhooks verificados y sincronización incremental. Se normalizan órdenes, publicaciones, pagos, fees, envíos, Flex, promociones e impuestos. Cada liquidación conserva raw payload protegido + snapshot normalizado. Conciliación compara esperado vs liquidado; tarifas actuales no recalculan historia.
+OAuth oficial, webhooks verificados y sincronización incremental. Se normalizan órdenes, publicaciones, pagos, fees, envíos, Flex, promociones e impuestos. Cada orden vincula su modalidad concreta `MERCADO_ENVIOS` o `MERCADO_ENVIOS_FLEX` y distingue importe/cargo de envío del costo logístico realmente soportado por Ferronik. Cada liquidación conserva raw payload protegido + snapshots normalizados de cargo, costo, tasas y rentabilidad. Mientras falten liquidación o costos significativos, la rentabilidad es `PROVISIONAL`; tarifas actuales nunca recalculan historia.
 
 ## MessagingProvider
 

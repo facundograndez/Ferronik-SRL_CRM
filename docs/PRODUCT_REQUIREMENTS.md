@@ -18,7 +18,7 @@ Construir el sistema central de operación de Ferronik SRL para ventas presencia
 1. Identity & Access: login, sesiones, recuperación, usuarios, roles y permisos.
 2. Catálogo & Pricing: productos, variantes, unidades, conversiones, listas e historial.
 3. Inventory: depósitos, movimientos, reservas, acopios y producción.
-4. CRM & Sales: clientes, presupuestos, ventas, remitos, recibos y comisiones.
+4. CRM, Sales & Logistics: clientes, presupuestos, ventas, entregas, remitos, recibos y comisiones.
 5. Procurement: proveedores, compras fiscales/mixtas/internas, NC y costos.
 6. Ledgers & Treasury: cuentas corrientes, cajas, bancos, cheques, gastos y cash flow.
 7. Fiscal & Channels: ARCA, Mercado Libre y mensajería Meta.
@@ -31,6 +31,10 @@ Construir el sistema central de operación de Ferronik SRL para ventas presencia
 - Operaciones multi-entidad atómicas mediante transacciones PostgreSQL.
 - Valores monetarios y cantidades con precisión decimal y moneda explícita.
 - Snapshots inmutables de factores, costos, tasas, conversiones y comisiones.
+- Toda venta distingue ingreso logístico cobrado al cliente (`shippingCharge`) del costo logístico real (`shippingCost`); su diferencia forma parte de la rentabilidad total.
+- Una entrega puede no ser requerida, retirarse por el cliente o enviarse. El estado de la venta, el fiscal y el logístico evolucionan de manera independiente.
+- La rentabilidad se declara `PROVISIONAL` mientras falte confirmar un costo significativo y `FINAL` sólo cuando todos los costos relevantes sean definitivos.
+- Clientes y proveedores mantienen saldos contables independientes por moneda. Una consolidación por tipo de cambio es únicamente informativa.
 - Ledger append-only para saldos; correcciones por contramovimiento, no edición destructiva.
 - Auditoría antes/después y motivo obligatorio para cambios críticos.
 - Paginación, filtros y ordenamiento server-side.
@@ -52,6 +56,8 @@ Cada fase requiere UI, backend, persistencia, autorización, validación, errore
 - Reglas de redondeo por lista/unidad y límites de descuentos por rol.
 - Base y porcentaje de comisión por vendedor/canal.
 - Imputación contable definitiva de NC y cargos comerciales.
+- Tratamiento fiscal del cargo de envío por tipo de comprobante/configuración vigente.
+- Umbral y catálogo de “costo significativo” que mantiene una rentabilidad provisional.
 - Proveedor de email, storage y observabilidad.
 
 Se modelan como configuración versionada; se definen antes de la fase que las consume.
