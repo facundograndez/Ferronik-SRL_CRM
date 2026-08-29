@@ -2,14 +2,16 @@
 
 ## Patrón común
 
-Cada integración implementa un puerto del application layer. El core opera con modelos propios; DTOs externos se traducen en adapters. Credenciales, endpoints y modo (`disabled`, `sandbox`, `production`) son configuración por ambiente.
+Todas las integraciones viven en `Ferronik-SRL_Backend` e implementan un puerto del application layer. El core opera con modelos propios; DTOs externos se traducen en adapters. Credenciales, endpoints y modo (`disabled`, `sandbox`, `production`) son configuración del backend por ambiente. El frontend nunca recibe secretos ni llama ARCA/MeLi/Meta directamente.
 
 ```mermaid
 sequenceDiagram
-  participant U as Use case
+  participant F as Frontend
+  participant U as Backend use case
   participant DB as PostgreSQL
   participant O as Outbox worker
   participant P as Provider adapter
+  F->>U: HTTPS API
   U->>DB: operación + outbox (transaction)
   O->>DB: claim event
   O->>P: request with idempotency key
@@ -44,6 +46,7 @@ Operaciones: iniciar upload, completar/verificar, firmar download y borrar lógi
 - Dead-letter/revisión manual con alerta.
 - Circuit breaker sólo si métricas justifican complejidad.
 - Logs con correlation ID y payloads redactados.
+- API y worker se despliegan desde el mismo repositorio/imagen backend con comandos de proceso diferentes; se comunican con cola/DB por red privada.
 
 ## Estado por fase
 

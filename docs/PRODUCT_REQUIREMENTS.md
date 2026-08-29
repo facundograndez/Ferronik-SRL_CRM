@@ -26,6 +26,9 @@ Construir el sistema central de operación de Ferronik SRL para ventas presencia
 
 ## Requisitos transversales
 
+- El producto se implementa en dos repositorios: frontend Next.js en Vercel y backend TypeScript independiente. Se comunican exclusivamente mediante HTTPS API con contrato OpenAPI.
+- El backend es la única fuente de verdad y el único proceso con acceso directo a PostgreSQL, Prisma, sesiones, permisos, motores e integraciones.
+- El frontend no calcula como verdad costos, rentabilidad, comisiones, stock, cuentas corrientes, impuestos o conversiones críticas; cualquier preview se recalcula en backend.
 - Toda ruta privada exige autenticación.
 - Autorización server-side en cada lectura/escritura sensible.
 - Operaciones multi-entidad atómicas mediante transacciones PostgreSQL.
@@ -48,7 +51,7 @@ Construir el sistema central de operación de Ferronik SRL para ventas presencia
 
 ## Definición de terminado
 
-Cada fase requiere UI, backend, persistencia, autorización, validación, errores, auditoría, tests, responsive, temas, documentación, CI verde y compatibilidad Vercel. Una integración debe etiquetarse `MOCK`, `SANDBOX` o `PRODUCTION READY`.
+Cada fase requiere UI, backend, persistencia, autorización, validación, errores, auditoría, tests, responsive, temas, documentación y ambos CI verdes. Frontend debe ser compatible con Vercel y backend con su plataforma seleccionada. Una integración debe etiquetarse `MOCK`, `SANDBOX` o `PRODUCTION READY`.
 
 ## Decisiones de negocio pendientes no bloqueantes para FASE 0
 

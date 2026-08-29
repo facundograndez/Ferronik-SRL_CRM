@@ -7,8 +7,8 @@ Autorización híbrida:
 1. Roles otorgan conjuntos base.
 2. Overrides por usuario permiten `ALLOW` o `DENY` explícito.
 3. `DENY` prevalece, salvo SUPERADMIN de sistema.
-4. El permiso se evalúa server-side en cada caso de uso y consulta.
-5. La UI consume capacidades efectivas sólo para experiencia; nunca es control de seguridad.
+4. El permiso se evalúa en `Ferronik-SRL_Backend` en cada caso de uso y consulta.
+5. `Ferronik-SRL_Frontend` consume capacidades efectivas sólo para experiencia; nunca es control de seguridad ni recibe datos que deba ocultar.
 
 Los permisos usan `recurso.acción`, se registran en catálogo y se referencian por clave estable.
 

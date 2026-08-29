@@ -5,6 +5,7 @@
 - Unit: motores puros, value objects, permisos y máquinas de estado.
 - Integration: repositorios y casos de uso contra PostgreSQL real, incluyendo locks/transactions.
 - Contract: adapters externos con fixtures sanitizados y schemas.
+- API contract: OpenAPI generado, breaking-change diff y cliente frontend reproducible sin DTOs duplicados.
 - E2E: Playwright para flujos de alto valor y aislamiento por rol.
 - Security: authz negativo, CSRF/origin, rate limit, exposición de campos y uploads.
 
@@ -33,7 +34,7 @@ Factories deterministas, reloj/UUID/provider inyectables. Cada test integration 
 
 ## CI
 
-En cada PR: `lint`, `typecheck`, unit, integration y build. E2E smoke corre sobre Preview; suite completa en merge/nightly según duración. Coverage es señal, no sustituto: umbral alto para engines y authz, más mutation testing opcional en cálculos críticos.
+En cada PR de cada repositorio: `lint`, `typecheck`, tests y build. Backend además valida migrations/OpenAPI; frontend regenera/verifica el cliente. E2E smoke conecta Preview Vercel con backend y DB preview reales; suite completa corre en merge/nightly según duración. Coverage es señal, no sustituto.
 
 ## Criterios de aceptación
 
@@ -48,4 +49,4 @@ En cada PR: `lint`, `typecheck`, unit, integration y build. E2E smoke corre sobr
 
 ## Build status de FASE 0
 
-No existe aplicación ni dependencias instaladas: lint/typecheck/tests/build son `NOT APPLICABLE` en esta fase documental, no “passing”. FASE 1 crea scripts y CI, y no se considera DONE sin los cuatro verdes.
+No existen aplicaciones ni dependencias instaladas: lint/typecheck/tests/build son `NOT APPLICABLE` en esta fase documental. FASE 1A/1B crean CI independientes y FASE 1 no se considera DONE hasta que ambos estén verdes y conectados sin mocks.

@@ -1,24 +1,39 @@
-# Ferronik ERP
+# Ferronik ERP — Arquitectura de FASE 0
 
-ERP greenfield para Ferronik SRL. El repositorio se encuentra en **FASE 0 — Arquitectura**.
+Este repositorio contiene la documentación arquitectónica greenfield de Ferronik SRL. **No es un tercer componente desplegable** y no contendrá código funcional del ERP.
 
-En esta fase no hay módulos de negocio implementados ni una aplicación desplegable. La fuente de verdad del diseño está en [`docs/`](docs/IMPLEMENTATION_PLAN.md).
+La arquitectura oficial se implementará en dos repositorios:
 
-## Decisiones principales
+| Repositorio | Responsabilidad | Deployment inicial |
+| --- | --- | --- |
+| `Ferronik-SRL_Frontend` | Next.js, experiencia de usuario y cliente OpenAPI | Vercel |
+| `Ferronik-SRL_Backend` | API, autenticación, dominio, PostgreSQL e integraciones | Railway (recomendado) |
 
-- Next.js App Router + React + TypeScript estricto.
-- PostgreSQL administrado en Neon, con Prisma ORM y runtime Node.js en Vercel.
-- Monolito modular con servicios de dominio y transacciones ACID.
-- Auth propia con sesiones opacas persistidas; autorización RBAC + permisos efectivos.
-- Dinero, cantidades, factores y tipos de cambio en `numeric`; nunca `float`.
-- Integraciones detrás de puertos/adapters y procesamiento idempotente.
+```text
+Ferronik-SRL_Frontend (Vercel)
+        |
+        | HTTPS / OpenAPI
+        v
+Ferronik-SRL_Backend (Railway)
+        |
+        +--> PostgreSQL / Neon
+        +--> cola y workers
+        +--> ARCA, Mercado Libre, Meta, FX y object storage
+```
+
+El frontend nunca accede directamente a PostgreSQL ni es fuente de verdad para cálculos financieros, stock, impuestos o permisos. El backend recalcula, valida y autoriza toda operación.
+
+## Documentación
+
+La fuente de verdad de FASE 0 está en [`docs/`](docs/IMPLEMENTATION_PLAN.md), incluyendo [arquitectura](docs/ARCHITECTURE.md), [contrato API](docs/API_CONTRACT.md), [autenticación](docs/AUTHENTICATION.md) y [deployment](docs/DEPLOYMENT_VERCEL.md).
 
 ## Estado
 
 | Fase | Estado |
 | --- | --- |
-| FASE 0 — Arquitectura | DONE (documentación) |
-| FASE 1 — Foundation | NOT STARTED |
+| FASE 0 — Arquitectura | DONE (documentación revisada) |
+| FASE 1A — Backend Foundation | NOT STARTED |
+| FASE 1B — Frontend Foundation | NOT STARTED |
 | FASE 2–15 | NOT STARTED |
 
-No hay URL de Vercel todavía: crearla pertenece a FASE 1.
+FASE 1 sólo será `DONE` cuando ambos repositorios estén desplegados y conectados mediante la API real. Todavía no existen URLs de producción.

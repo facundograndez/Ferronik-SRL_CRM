@@ -1,90 +1,132 @@
 # Architecture
 
-## Stack definitivo
+## Decisión principal
 
-- Web: Next.js estable con App Router, React, TypeScript `strict`, Tailwind CSS y shadcn/ui.
-- Backend: Route Handlers para APIs/webhooks, Server Components para lecturas y servicios de aplicación para casos de uso. Server Actions sólo para formularios internos simples.
-- Datos: PostgreSQL administrado en Neon; branching para preview y bases separadas para desarrollo/producción.
-- ORM: Prisma. Se elige por esquema declarativo, migraciones versionadas, transacciones, tipos generados y buena ergonomía para un dominio relacional grande. Queries críticas podrán usar SQL parametrizado dentro de repositorios.
-- Validación: Zod en fronteras; invariantes adicionales en dominio.
-- Tests: Vitest (unidad/integración), Testcontainers o PostgreSQL efímero en CI, Playwright (E2E).
-- Observabilidad: logs JSON con correlation ID, captura de errores y métricas por proveedor configurable.
-- Archivos: object storage S3-compatible mediante `DocumentStorage`.
-
-No se fija una versión exacta de dependencias en FASE 0. FASE 1 las fijará en lockfile usando releases estables vigentes y Node.js soportado por Next.js/Vercel.
-
-## Estilo arquitectónico
-
-Monolito modular desplegado como una aplicación Next.js. Reduce complejidad operativa inicial y conserva fronteras que permiten extraer workers o servicios si la carga lo exige.
+Ferronik ERP se implementará como dos aplicaciones independientes y dos repositorios, no como un full-stack Next.js ni un monorepo:
 
 ```mermaid
 flowchart LR
-  UI[App Router UI] --> UC[Application use cases]
-  API[Route handlers / webhooks] --> UC
-  UC --> DOM[Domain services and policies]
-  UC --> PORTS[Ports]
-  PORTS --> DB[(PostgreSQL)]
-  PORTS --> OBJ[(Object storage)]
-  PORTS --> EXT[ARCA / MeLi / Meta / FX]
-  UC --> AUD[Audit + outbox]
+  FE[Ferronik-SRL_Frontend<br/>Next.js on Vercel] -->|HTTPS + OpenAPI| BE[Ferronik-SRL_Backend<br/>TypeScript API on Railway]
+  BE --> DB[(PostgreSQL / Neon)]
+  BE --> Q[Queue + workers]
+  BE --> OBJ[(Object storage)]
+  BE --> EXT[ARCA / MeLi / Meta / FX]
 ```
 
-Dependencias permitidas: `presentation -> application -> domain`; infrastructure implementa puertos hacia adentro. Componentes React no importan Prisma ni contienen reglas comerciales.
+No se crea un tercer repositorio de contratos: el backend publica OpenAPI como artefacto versionado y el frontend genera su cliente desde ese artefacto.
 
-## Estructura prevista
+## Stack definitivo
+
+### Frontend
+
+- Next.js estable con App Router, React, TypeScript `strict`, Tailwind CSS y shadcn/ui.
+- Server Components para composición/render cuando aporten valor; Client Components para interacción.
+- Formularios y previews locales para UX, siempre recalculados/validados por la API.
+- Cliente TypeScript generado desde OpenAPI; nunca Prisma ni conexión PostgreSQL.
+- Vitest/Testing Library para unidad y Playwright para E2E.
+- Deployment en Vercel.
+
+### Backend
+
+- Servicio TypeScript Node.js independiente. Framework HTTP a seleccionar en FASE 1A entre Fastify y NestJS sobre Fastify, priorizando OpenAPI, validación y bajo acoplamiento.
+- PostgreSQL administrado inicialmente en Neon y Prisma ORM.
+- Servicios de aplicación, dominio independiente e infrastructure adapters.
+- API REST JSON documentada con OpenAPI 3.1.
+- Proceso web persistente, worker(s) y cron/jobs desplegados inicialmente en Railway.
+- Vitest para unidad/integración, PostgreSQL real efímero/Testcontainers y tests de contrato.
+
+No se fijan versiones exactas en FASE 0; cada repositorio tendrá su propio lockfile y CI con versiones estables vigentes al comenzar su fase.
+
+## Fronteras y fuente de verdad
+
+```text
+Frontend: presentation -> generated API client
+                              |
+                              v HTTPS
+Backend:  transport -> application -> domain <- infrastructure
+                                           |
+                                           v
+                                      PostgreSQL/adapters
+```
+
+- El backend es la única fuente de verdad para pricing, rentabilidad, costos, comisiones, stock, compras, ventas, producción, impuestos, conversiones, cuentas corrientes y permisos.
+- El frontend puede calcular previews no autoritativos para respuesta visual; la confirmación usa exclusivamente el resultado recalculado por backend.
+- El frontend renderiza capacidades informadas por backend, pero ocultar UI nunca sustituye autorización server-side.
+- Sólo el backend conoce `DATABASE_URL`, Prisma y credenciales de integraciones.
+
+## Estructuras previstas
+
+### `Ferronik-SRL_Frontend`
 
 ```text
 src/
-  app/                       # rutas, layouts, route handlers
-    (public)/                # login y recuperación
-    (erp)/                   # shell privado
-    api/                     # APIs y webhooks
-  components/
-    ui/                      # primitives del design system
-    shared/
+  app/                     # rutas públicas y shell autenticado
+  components/ui/           # design system
+  components/shared/
+  features/                # pantallas y composición por dominio
+  api/
+    generated/             # cliente generado; no editar manualmente
+    client.ts              # transporte, errores y credentials
+  auth/                    # consumo de sesión y guards visuales
+  lib/
+tests/unit/
+tests/e2e/
+```
+
+### `Ferronik-SRL_Backend`
+
+```text
+src/
+  transport/http/          # controllers/routes, schemas y OpenAPI
   modules/
     identity/ catalog/ pricing/ inventory/ crm/ sales/ logistics/
     procurement/ production/ ledger/ treasury/ fiscal/
     channels/ documents/ reporting/ notifications/ audit/
-      domain/                # entidades, value objects, políticas
-      application/           # casos de uso, DTOs y puertos
-      infrastructure/        # repositorios y adapters
-      presentation/          # componentes específicos
-  lib/                       # DB, auth, env, errors, logging
-prisma/
-  schema.prisma
-  migrations/
-  seed.ts
-tests/
-  unit/ integration/ e2e/
-docs/
+      domain/
+      application/
+      infrastructure/
+  workers/                 # outbox y consumidores
+  jobs/                    # tareas programadas reentrantes
+  shared/                  # DB, env, errors, logging
+prisma/schema.prisma
+prisma/migrations/
+openapi/openapi.json       # artefacto generado/verificado
+tests/unit/
+tests/integration/
+tests/contract/
 ```
 
-## Convenciones
+## Contrato API
 
-- IDs UUIDv7/UUID y timestamps UTC; zona de presentación `America/Argentina/Buenos_Aires`.
-- DTOs nunca exponen hashes, tokens, costos o márgenes sin permiso.
-- Errores tipados: validation, unauthorized, forbidden, conflict, not-found, integration/transient.
-- Toda escritura recibe actor, correlation ID e idempotency key cuando aplique.
-- Fechas de negocio (`date`) se separan de instantes (`timestamptz`).
-- `Money` siempre contiene amount + currency; no se suman monedas diferentes. `ProfitabilitySnapshot` agrega productos, logística, otros ingresos/costos y su estado `PROVISIONAL|FINAL`.
-- Sales es dueño del compromiso comercial y Logistics de la entrega. `SaleDelivery` referencia la venta, pero sus estados no cambian implícitamente el estado comercial o fiscal.
-- `vercel.json` no se crea mientras defaults de framework alcancen.
+- OpenAPI 3.1 generado desde las rutas/schemas del backend y validado en CI.
+- El backend publica `openapi.json` como artefacto versionado y endpoint de documentación protegido según ambiente.
+- El frontend genera un cliente TypeScript determinista; no mantiene DTOs duplicados.
+- PRs del backend ejecutan detección de breaking changes contra la versión publicada.
+- Cambios compatibles se agregan de forma aditiva. Breaking changes requieren versión mayor/ruta versionada y ventana de migración.
+- Frontend CI falla si el cliente generado no coincide con el contrato fijado o si rompe typecheck/tests.
+
+## Convenciones compartidas
+
+- IDs UUIDv7/UUID, timestamps UTC y zona de presentación `America/Argentina/Buenos_Aires`.
+- Dinero/cantidades/factores son Decimal; `Money` incluye amount + currency.
+- Errores API usan estructura estable con code, message seguro, field errors y correlation ID.
+- Mutaciones aceptan idempotency key cuando aplique; eventos externos usan outbox.
+- `ProfitabilitySnapshot` agrega productos, logística y otros conceptos con estado `PROVISIONAL|FINAL`.
+- Estados comercial, fiscal y logístico son independientes.
 
 ## Consistencia y asincronía
 
-- Venta, compra, producción, retiro, pago y transferencia cruzada ejecutan una única transacción local.
-- Integraciones externas no se llaman dentro de una transacción larga. Se guarda operación + evento outbox atómicamente y se procesa con reintentos.
-- Webhooks se autentican, persisten por clave idempotente y responden rápido; el procesamiento es reentrante.
-- Jobs cortos pueden ejecutarse con Vercel Cron/Functions. Cargas largas se delegarán a un proveedor de colas compatible cuando haya requerimiento medido.
+- Venta, compra, producción, retiro, pago y transferencia cruzada son transacciones locales del backend.
+- Integraciones externas no se ejecutan dentro de transacciones largas: operación + outbox se guardan atómicamente.
+- Worker persistente procesa outbox, reintentos y conciliaciones. Cron sólo dispara trabajos idempotentes.
+- Webhooks se autentican, persisten por clave idempotente y responden rápido.
 
-## ADR resumidos
+## ADR
 
-- ADR-001: monolito modular antes que microservicios.
-- ADR-002: Prisma + PostgreSQL/Neon; runtime Node.js, no Edge, para transacciones previsibles.
-- ADR-003: sesiones opacas persistidas, no JWT auto-contenido como fuente de autorización.
-- ADR-004: ledger y movimientos append-only.
-- ADR-005: adapters para ARCA, Mercado Libre, Meta, FX y storage.
-- ADR-006: logística de venta modelada, no un campo genérico; cargo, costo, fiscalidad, dirección y estados poseen integridad y snapshots.
-- ADR-007: subledgers por moneda; equivalentes consolidados son proyecciones informativas, nunca saldo fuente.
-- ADR-008: rentabilidad histórica versionada y explícitamente provisional o final.
+- ADR-001 (superseded): monolito full-stack Next.js.
+- ADR-009: dos repositorios/aplicaciones, frontend y backend, unidos por HTTPS/OpenAPI.
+- ADR-010: backend único dueño de DB, autenticación, autorización y reglas de negocio.
+- ADR-011: OpenAPI generado; cliente TypeScript derivado, sin DTOs duplicados.
+- ADR-012: frontend en Vercel y backend inicialmente en Railway con procesos API/worker/cron.
+- ADR-013: no existe repositorio separado de contratos; el backend publica el artefacto.
+- ADR-014: subledgers por moneda, logística modelada y rentabilidad histórica versionada se conservan sin cambios.

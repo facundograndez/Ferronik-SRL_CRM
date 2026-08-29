@@ -1,49 +1,57 @@
 # Authentication
 
-## Enfoque
+## Propiedad y confianza
 
-Autenticación propia para empleados, separada de la autorización. Se implementará con primitivas auditadas (Auth.js cuando su versión estable vigente cubra el flujo Credentials) y servicios propios para alta, bloqueo, primer acceso y recuperación. No se inventará criptografía.
+La autenticación y autorización pertenecen exclusivamente a `Ferronik-SRL_Backend`. El frontend muestra formularios, envía credenciales, consulta sesión y renderiza capacidades, pero no valida passwords, no emite sesiones y no decide acceso a datos.
+
+## Topología recomendada
+
+- Frontend: `app.erp.ferronik.com.ar` en Vercel.
+- Backend: `api.erp.ferronik.com.ar` en Railway.
+- Ambos comparten el mismo sitio registrable (`ferronik.com.ar`) pero mantienen origins diferentes.
+
+El backend usa una cookie de sesión opaca, `HttpOnly`, `Secure`, `SameSite=Lax`, con alcance host-only para `api.erp.ferronik.com.ar`. El navegador realiza requests a la API con `credentials: include`. JavaScript nunca lee el token; obtiene identidad/capacidades desde `GET /v1/session`.
+
+Esta estrategia debe validarse con los dominios definitivos en FASE 1A/1B. Si frontend y API no pueden compartir sitio registrable, se reevaluará `SameSite=None; Secure`, CSRF reforzado o un proxy/BFF de transporte sin lógica de negocio.
+
+## CORS y CSRF
+
+- CORS allowlist exacta por ambiente; nunca `*` con credenciales.
+- Sólo origins frontend conocidos; métodos/headers mínimos y preflight cacheado prudentemente.
+- Toda mutación valida `Origin`/`Referer` y token CSRF ligado a sesión cuando corresponda.
+- `SameSite` es defensa adicional, no sustituto de verificación CSRF.
+- Webhooks externos usan rutas y autenticación/firma separadas, nunca cookies de usuario.
 
 ## Credenciales
 
-- Password hash Argon2id con parámetros calibrados en el runtime; fallback sólo si la plataforma lo exige y queda documentado.
-- Reglas de longitud y contraseñas comprometidas; no reglas cosméticas rígidas.
-- Hash y tokens jamás salen de server/infrastructure.
+- Argon2id con parámetros calibrados en backend.
+- Email/username normalizados y comparación segura.
+- Hashes y tokens nunca salen del backend.
 - Contraseña temporal implica `must_change_password=true`.
 
 ## Sesiones
 
-- Token opaco aleatorio en cookie `HttpOnly`, `Secure` en producción, `SameSite=Lax`, path `/`.
-- En DB sólo se guarda hash del token, usuario, expiración, última actividad, metadata mínima y revocación.
-- Expiración absoluta y ociosa; “recordarme” selecciona política más larga, no elimina expiración.
-- Rotación al autenticar/cambiar privilegios/contraseña; logout y bloqueo revocan sesiones.
-- No se usa JWT auto-contenido para permisos: revocación y cambios deben ser inmediatos.
+- Token aleatorio opaco; DB almacena sólo su hash, usuario, expiraciones, metadata mínima y revocación.
+- Expiración absoluta y ociosa; “recordarme” selecciona una política más larga pero finita.
+- Rotación al autenticar, cambiar password o privilegios.
+- Logout, bloqueo y cambio de contraseña revocan sesiones.
+- Permisos no viven como verdad en JWT cliente; backend los resuelve y puede invalidarlos de inmediato.
 
 ## Flujos
 
-### Login
+- Login: frontend envía credenciales por HTTPS; backend rate-limita, valida, crea cookie y audita.
+- Recuperación: respuesta no enumerable, token de alta entropía hasheado, expiración corta y uso único.
+- Primer acceso: backend impide otras operaciones privadas hasta cambiar password.
+- Sesión: frontend hidrata usuario/capabilities desde API y muestra estado de carga/error/expiración.
+- Protección de ruta frontend mejora UX, pero cada endpoint backend repite autenticación y permiso.
 
-Normalizar identificador, rate-limit por IP + identidad, verificar usuario activo y hash en tiempo constante, crear sesión, auditar éxito/fallo relevante y redirigir sólo a rutas internas validadas.
+## Seguridad operacional
 
-### Recuperación
+- Rate limit distribuido por IP + identidad para login/recuperación.
+- CSP/headers en frontend y backend; HSTS en dominios productivos.
+- Logs sin password, cookie o token; eventos de autenticación auditados.
+- Credenciales ARCA/MeLi/Meta nunca se comparten con Vercel/frontend.
 
-Respuesta indistinguible exista o no la cuenta. Token de alta entropía, hash en DB, uso único, expiración corta. Al restablecer: invalidar sesiones, marcar token usado, auditar y notificar.
+## Decisión pendiente antes de implementación
 
-### Cambio/primer acceso
-
-Requiere sesión reciente y contraseña actual salvo token de primer acceso. Tras cambio se rota la sesión. Rutas privadas distintas del cambio quedan bloqueadas mientras `must_change_password` sea verdadero.
-
-## Protección de rutas
-
-Un proxy/middleware hace redirección temprana para UX, pero cada Server Component, Route Handler y Server Action vuelve a verificar sesión y permiso. Rutas públicas allowlisted: `/login`, solicitud/confirmación de recuperación y assets necesarios.
-
-## CSRF y abuso
-
-- Cookies SameSite, validación de Origin para mutaciones y tokens CSRF cuando el mecanismo de framework no sea suficiente.
-- Rate limit distribuido para login/recuperación y lockout progresivo sin permitir denegación permanente por atacante.
-- Mensajes genéricos; logs sin password/token.
-- Headers de seguridad, CSP progresiva, HSTS en producción y protección clickjacking.
-
-## Auditoría
-
-Eventos: login exitoso, fallo relevante, logout, recuperación solicitada/consumida, password cambiado, sesión revocada, usuario bloqueado y privilegios modificados. IP/user-agent se minimizan y retienen según política a definir.
+Confirmar dominio productivo y dominios de preview. Esta decisión fija atributos finales de cookie, CORS y CSRF; no se hardcodearán hasta entonces.

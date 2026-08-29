@@ -1,70 +1,96 @@
-# Deployment on Vercel
+# Deployment — Frontend on Vercel, Backend on Railway
 
-## 1. Crear proyecto
+## Decisión
 
-Conectar el repositorio Git a Vercel y seleccionar Next.js. `main` será Production Branch; cada PR/branch genera Preview. No se requiere `vercel.json` mientras los defaults sean suficientes.
+- `Ferronik-SRL_Frontend`: Vercel, por integración nativa con Next.js, previews por branch y rollback de deployments.
+- `Ferronik-SRL_Backend`: Railway inicialmente, como servicio Node.js persistente más worker(s), cron y cola privada.
+- PostgreSQL: Neon administrado si su evaluación de región, backups, pooling y branching continúa satisfaciendo el proyecto.
 
-## 2. Ambientes y variables
+El nombre histórico de este documento se conserva por el requisito Vercel del frontend; ya no afirma que todo el ERP se despliega allí.
 
-Configurar Development, Preview y Production por separado. Los secretos de Preview/Production deben marcarse sensitive. Nunca asignar a Preview credenciales productivas de ARCA, Mercado Libre o Meta. `APP_ENV` se valida contra `VERCEL_ENV` al iniciar.
+## Comparación backend verificada en FASE 0
 
-## 3. Base de datos
+| Plataforma | Fortalezas | Riesgos/limitaciones para Ferronik | Decisión |
+| --- | --- | --- | --- |
+| Vercel | Functions, Cron, Queues/Workflow administrados, observabilidad integrada | Modelo orientado a invocaciones, límites de duración; Cron comparte esos límites y no reintenta fallos por sí solo | No seleccionada inicialmente para backend; sí frontend |
+| Railway | Servicio persistente, workers siempre activos, cron, Redis/RabbitMQ y red privada por ambiente | Cron puede omitir una ejecución solapada; observabilidad avanzada puede requerir proveedor externo | **Recomendada** por equilibrio entre capacidad y operación |
+| Render | Web services, background workers, cron, private network, health checks y zero-downtime deploy | Algunos features/pre-deploy dependen del plan; separar servicios incrementa costo | Segunda opción administrada |
+| Fly.io | Machines, process groups, red privada, escalado/regiones y gran control | Mayor carga de Docker, red, escalado y operación; Postgres no administrado requiere responsabilidad propia | Alternativa si región/control lo justifican |
 
-Neon es la opción inicial por PostgreSQL serverless, pooling y branching. Producción tiene proyecto/branch protegido. Preview usa branch/database aislada y datos sintéticos; si no hay automatización por PR, usa una DB preview compartida sin datos reales y con migraciones compatibles.
+Railway evita diseñar ARCA, conciliaciones y outbox alrededor de ejecuciones HTTP limitadas, y permite evolucionar `api + worker + cron + queue` dentro de un mismo proyecto y red privada. La selección se revalida al comenzar FASE 1A con precios, región cercana a Neon/Argentina, SLA y requisitos ARCA vigentes.
 
-Runtime recibe `DATABASE_URL` pooled. CI/migrations recibe `DIRECT_DATABASE_URL` con alcance restringido. Las funciones corren en Node.js y reutilizan el cliente Prisma a nivel de módulo.
+## Ambientes
 
-## 4. Migrations
+### Development
 
-- PR: generar SQL, revisar cambios destructivos y probar sobre DB efímera/preview.
-- Producción: backup/checkpoint, ejecutar `prisma migrate deploy` una vez mediante job CI protegido, luego desplegar/promover app.
-- Cambios incompatibles usan expand/migrate/contract en múltiples releases.
-- Nunca ejecutar `migrate dev` ni `db push` en producción.
+Frontend local contra backend local/dev. DB y storage sintéticos. `.env` separados por repositorio; frontend sólo contiene URL pública de API y flags no secretos.
 
-## 5. Build
+### Preview
 
-Pipeline obligatorio: install locked, lint, typecheck, unit/integration tests y `next build`. El build no debe necesitar conectarse a producción ni ejecutar migrations.
+- Vercel crea preview del frontend por PR.
+- Backend requiere ambiente/deployment preview compatible y URL conocida por el frontend.
+- Neon branch o DB preview aislada; datos sintéticos.
+- ARCA `disabled|homologation`; MeLi/Meta `disabled|sandbox`.
+- CORS incluye únicamente origins preview autorizados. Como URLs Vercel son dinámicas, usar integración que registre origins o un dominio preview controlado; nunca regex abierta a dominios ajenos.
 
-## 6. Deployment
+### Production
 
-Push a branch crea Preview; merge a `main` crea candidato de Production. Promoción sólo después de health smoke test y migrations compatibles. Las regiones de funciones se acercan a la región primaria de DB.
+Frontend Vercel en dominio `app...`; backend Railway en `api...`; Neon productivo protegido. Secretos separados y acceso mínimo.
 
-## 7. Preview deployments
+## Pipeline frontend
 
-- URL única por PR.
-- Base aislada o sintética, email sink, storage de preview.
-- `ARCA_MODE=disabled|homologation`; `MELI_MODE=disabled|sandbox`; `META_MODE=disabled|sandbox`.
-- Banner visible de no producción y bloqueo server-side de adapters production.
+1. Install locked.
+2. Obtener/fijar OpenAPI publicado por backend y regenerar cliente.
+3. Verificar que generated client no tenga diff inesperado.
+4. Lint, typecheck, unit, E2E/contract y `next build`.
+5. Preview Vercel; smoke contra backend preview real.
+6. Merge/promoción y rollback independiente.
 
-## 8. Producción
+## Pipeline backend
 
-Dominio, HSTS, backups/PITR, alertas de error/latencia, presupuesto y logs estructurados. `/api/health` comprueba proceso/configuración sin filtrar secretos; `/api/ready` puede comprobar DB con rate limit y protección operativa.
+1. Install locked; lint, typecheck, unit/integration/contract.
+2. Generar OpenAPI y ejecutar breaking-change diff.
+3. Construir una imagen reproducible para API/worker/jobs.
+4. Probar migrations sobre DB efímera/preview.
+5. Producción: backup/checkpoint y `prisma migrate deploy` mediante pre-deploy/job único protegido.
+6. Desplegar API y worker, ejecutar health/readiness y smoke.
 
-## 9. Rollback
+## Orden y compatibilidad
 
-El código puede volver mediante Instant Rollback/promote. La DB no se “desmigra” automáticamente: migrations son forward-compatible y se corrigen con una migration nueva. Antes de rollback verificar compatibilidad entre versión anterior y esquema actual.
+Frontend y backend se despliegan independientemente. Cambios API siguen expand/migrate/contract: desplegar primero soporte backend compatible, luego frontend consumidor y sólo después retirar el contrato anterior. Rollback de código nunca intenta revertir automáticamente DB.
 
-## 10. Secretos
+## Health, jobs y observabilidad
 
-- Guardar sólo en Vercel/env manager; rotar periódicamente y ante incidentes.
-- Separar credenciales por ambiente y mínimo privilegio.
-- Certificados ARCA en base64/secret store sólo si el adapter lo exige; jamás logs.
-- No exponer variables server con prefijo público.
-- Acceso a Production limitado y auditado.
+- Backend expone `/health` (proceso) y `/ready` (dependencias críticas) sin secretos.
+- API no ejecuta trabajos largos; encola y responde con identificador.
+- Worker procesa outbox con retries, idempotencia y dead-letter.
+- Cron dispara jobs reentrantes con lock; el código contempla ejecuciones omitidas/duplicadas.
+- Logs JSON, correlation ID extremo a extremo, error reporting y métricas de API/worker/cola.
 
-## Checklist inicial de FASE 1
+## Secretos
 
-1. Crear Neon dev/preview/prod y confirmar región/pooling.
-2. Importar variables desde `.env.example` con valores separados.
-3. Conectar Git y activar previews.
-4. Agregar CI y migration job protegido.
-5. Desplegar, ejecutar smoke de login/privacidad/logout/health.
-6. Registrar URL y estado real; hasta entonces Vercel Status es `NOT DEPLOYED`.
+- Vercel: sólo configuración frontend; nunca DB, Prisma, ARCA, MeLi, Meta ni storage credentials.
+- Railway: DB, session secret, certificados y tokens backend como variables/secretos por ambiente.
+- Neon y proveedores usan mínimo privilegio, rotación y credenciales distintas por ambiente.
+- `NEXT_PUBLIC_*` jamás contiene secretos.
 
-## Referencias verificadas en FASE 0
+## Rollback
 
-- [Next.js App Router](https://nextjs.org/docs/app)
-- [Vercel environment variables](https://vercel.com/docs/environment-variables)
-- [Vercel Git deployments](https://vercel.com/docs/git)
-- [Vercel Instant Rollback](https://vercel.com/docs/instant-rollback)
-- [Prisma serverless deployment](https://www.prisma.io/docs/orm/prisma-client/deployment/serverless)
+- Frontend: Instant Rollback/promote en Vercel.
+- Backend: rollback/redeploy del artefacto anterior sólo si es compatible con el esquema actual.
+- DB: forward fix con migration nueva; backups/PITR para incidentes de datos, no como rutina de deploy.
+
+## Estado actual
+
+Frontend Vercel: `NOT DEPLOYED`. Backend Railway: `NOT DEPLOYED`. DB: `NOT CREATED`. Ninguna plataforma queda `PRODUCTION READY` durante FASE 0.
+
+## Referencias oficiales
+
+- [Vercel Function duration](https://vercel.com/docs/functions/configuring-functions/duration)
+- [Vercel Cron](https://vercel.com/docs/cron-jobs/manage-cron-jobs)
+- [Vercel Queues](https://vercel.com/docs/queues)
+- [Railway workers, queues and cron](https://docs.railway.com/guides/cron-workers-queues)
+- [Railway private networking](https://docs.railway.com/networking/private-networking)
+- [Render background workers](https://render.com/docs/background-workers)
+- [Render deploys](https://render.com/docs/deploys)
+- [Fly.io process groups](https://fly.io/docs/launch/processes/)

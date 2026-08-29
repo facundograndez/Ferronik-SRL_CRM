@@ -3,6 +3,7 @@
 ## Principios
 
 - PostgreSQL es la fuente de verdad.
+- Sólo `Ferronik-SRL_Backend` accede a PostgreSQL y ejecuta Prisma/migrations. Frontend, navegador y Vercel consumen datos exclusivamente por HTTPS API.
 - `numeric(19,4)` para dinero, `numeric(20,8)` para cantidades/factores y `numeric(20,10)` cuando una conversión lo requiera. La escala concreta se valida por concepto.
 - Cada importe incluye moneda; cada conversión histórica guarda tasa, fuente y fecha.
 - Entidades operativas usan `created_at`, `updated_at`, `created_by` y control de concurrencia (`version`).
@@ -118,4 +119,4 @@ Una proyección puede mostrar equivalente consolidado a una moneda seleccionada,
 
 ## Migraciones
 
-Prisma Migrate genera SQL versionado. Desarrollo usa `migrate dev`; CI valida drift; producción ejecuta `migrate deploy` como paso separado y controlado antes de promover código. Cambios incompatibles siguen expand/migrate/contract y nunca dependen del rollback de frontend.
+Prisma Migrate vive en el repositorio backend y genera SQL versionado. Desarrollo usa `migrate dev`; CI backend valida drift; producción ejecuta `migrate deploy` como paso separado y controlado antes de promover el backend. Cambios incompatibles siguen expand/migrate/contract y nunca dependen del rollback del frontend.

@@ -1,93 +1,117 @@
 # Implementation Plan
 
-## Forma de trabajo obligatoria
+## Forma de trabajo
 
-Antes de cada fase se publicará: GOAL, ARCHITECTURE, DATABASE CHANGES, FILES TO CREATE, FILES TO MODIFY y RISKS. Después: IMPLEMENTED, TESTS, BUILD STATUS, VERCEL STATUS, KNOWN LIMITATIONS y NEXT PHASE.
+Antes de cada fase: GOAL, ARCHITECTURE, DATABASE CHANGES, FILES TO CREATE, FILES TO MODIFY y RISKS. Después: IMPLEMENTED, TESTS, BUILD STATUS, FRONTEND STATUS, BACKEND STATUS, KNOWN LIMITATIONS y NEXT PHASE.
 
 ## FASE 0 — Arquitectura
 
 ### GOAL
 
-Definir stack, repositorio, límites de dominio, datos, seguridad, deployment, integraciones, testing y roadmap sin desarrollar módulos. La revisión final incorpora logística de ventas, rentabilidad total/provisional, regla Ferronik de compras mixtas y ledgers multimoneda.
+Definir los dos repositorios, contrato API, límites de confianza, datos, seguridad, deployment, integraciones, testing y roadmap sin implementar aplicaciones.
 
 ### ARCHITECTURE
 
-Monolito modular Next.js/Node en Vercel, PostgreSQL/Neon, Prisma, servicios de aplicación, dominio independiente e integraciones por adapters/outbox.
+Frontend Next.js independiente en Vercel; backend TypeScript independiente inicialmente en Railway; PostgreSQL/Neon sólo accesible por backend; contrato OpenAPI con cliente generado.
 
 ### DATABASE CHANGES
 
-Ninguna. Se diseñó el modelo conceptual; no se creó DB ni migration.
+Ninguna. Sólo modelo conceptual; no existe DB ni migration ejecutable.
 
-### FILES CREATED
+### FILES CREATED/MODIFIED
 
-`README.md`, `.gitignore`, `.env.example` y diez documentos mínimos en `docs/`.
+Documentación de arquitectura, contrato, autenticación, datos, deployment, negocio, permisos, integraciones, testing y roadmap.
 
 ### RISKS
 
-- Fiscalidad argentina y APIs externas cambian: validar documentación oficial en sus fases.
-- Precisión/concurrencia de stock y ledgers requieren integración con PostgreSQL real.
-- Vercel no es un worker persistente: eventos largos necesitan cola/proveedor compatible.
-- Las reglas de comisión, vencimiento y redondeo aún requieren decisiones antes de implementarse.
-- Fiscalidad del cargo de envío y catálogo de costos significativos deben quedar configurables y validarse antes de FASE 6.
+- Dos repositorios exigen coordinación de versiones, previews y despliegues compatibles.
+- Cookies/CORS/CSRF dependen de dominios definitivos; deben cerrarse antes del login real.
+- Región/latencia/costo de Railway y Neon deben medirse antes de producción.
+- Jobs, webhooks e integraciones exigen cola, idempotencia y observabilidad desde el backend.
+- El repositorio actual de FASE 0 no debe convertirse accidentalmente en un tercer runtime repository.
 
 ### EXIT
 
-Documentación coherente, trazable al requerimiento y sin afirmar funcionalidad inexistente.
+Documentación coherente, ADR monolítico marcado superseded y ninguna implementación de FASE 1.
 
-## Fases de entrega
-
-| Fase | Alcance | Dependencias / salida clave |
-| --- | --- | --- |
-| 1 Foundation | scaffold, CI, DB, auth, sesiones, users/RBAC, audit base, shell/theme, deploy | URL Vercel funcional y acceso seguro |
-| 2 Catálogo | productos, variantes, unidades, listas, Pricing/Unit engines | snapshots y actualización masiva |
-| 3 Inventory | depósitos, movimientos, reservas, acopios | stock concurrente consistente |
-| 4 Customers | ficha, subledgers ARS/USD, pagos/imputaciones | saldos por moneda; consolidado sólo informativo |
-| 5 Quotes/CRM | pipeline, timeline, PDF/envíos | conversión preparada |
-| 6 Sales & Logistics | A/B/interna, pricing, comisión, pagos, entrega, cargo/costo logístico, rentabilidad provisional/final y remitos | operación transaccional y snapshots auditables |
-| 7 Procurement | proveedores, compra mixta, NC, cost engine | subledgers fiscal/comercial |
-| 8 Production | BOM, orden, consumos/output | costo snapshot |
-| 9 Treasury | cajas, gastos, cheques, cross-transfer, cash flow | saldos derivados |
-| 10 ARCA | adapter, homologación, CAE, PDF | primero SANDBOX, luego readiness |
-| 11 Mercado Libre | OAuth, sync, fees, cargo/costo logístico por orden, rentabilidad provisional/final, conciliación | snapshots históricos |
-| 12 Meta | WhatsApp/Instagram/Facebook oficiales | historial comunicación |
-| 13 Command Center | KPIs, alertas y reportes | queries autorizadas/performantes |
-| 14 Migration | ETL selectivo legacy | preview/reconcile; sin adaptar core |
-| 15 Hardening | performance, seguridad, DR, observabilidad | production readiness review |
-
-## FASE 1 — propuesta de primer corte
+## FASE 1A — Backend Foundation
 
 ### GOAL
 
-Aplicación mínima desplegada con login, logout, recuperación, sesión persistente, SUPERADMIN, usuarios/RBAC, auditoría base, shell privado y temas.
+Crear `Ferronik-SRL_Backend` como servicio real desplegado.
 
-### DATABASE CHANGES
+### SCOPE
 
-Identity, sessions, reset tokens, roles, permissions, settings y audit log; primera migration y seed idempotente de permisos/SUPERADMIN mediante secreto temporal.
+- TypeScript Node.js y framework HTTP seleccionado.
+- PostgreSQL/Neon, Prisma, migrations y seed idempotente.
+- Login, logout, recuperación, sesiones, usuarios, roles y permisos.
+- Auditoría base, rate limit, CORS/CSRF y secrets.
+- OpenAPI 3.1, errores estables, health/readiness.
+- Unit/integration/contract tests y CI.
+- Deploy Railway de API; base para worker/cron sin implementar integraciones futuras.
 
-### FILES TO CREATE
+### DONE GATE
 
-Scaffold Next.js, Prisma schema/migrations, módulos identity/audit, UI pública/privada, tests, workflow CI y health endpoint.
+API desplegada, DB real conectada, autenticación/autorización probadas, OpenAPI publicado y CI verde. Todavía no completa FASE 1 sin frontend.
 
-### RISKS
+## FASE 1B — Frontend Foundation
 
-Proveedor de email y creación segura del primer SUPERADMIN; se resuelven antes de cerrar la fase, sin hardcodear credenciales.
+### GOAL
+
+Crear `Ferronik-SRL_Frontend` y conectarlo a 1A.
+
+### SCOPE
+
+- Next.js, TypeScript strict, Tailwind y design system Ferronik.
+- Login visual, manejo/expiración de sesión y route guards de UX.
+- Cliente TypeScript generado desde OpenAPI.
+- Layout autenticado, sidebar, header, light/dark.
+- Administración de usuarios usando API real.
+- Unit/E2E, CI y Preview/Production Vercel.
+
+### DONE GATE
+
+Frontend desplegado, login/session/logout y usuarios operando contra backend real; protección backend verificada; ambos builds/tests verdes. Sólo entonces FASE 1 es `DONE`.
+
+## Fases posteriores
+
+Cada fase coordina cambios backend compatibles, publicación OpenAPI, regeneración del cliente y UI. La lógica crítica permanece backend.
+
+| Fase | Backend | Frontend / salida |
+| --- | --- | --- |
+| 2 Catálogo | productos, variantes, unidades, Pricing/Unit engines | productos/listas y previews validados por API |
+| 3 Inventory | movimientos, reservas, acopios, concurrencia | operación de depósito |
+| 4 Customers | clientes, subledgers ARS/USD e imputaciones | ficha y CC por moneda |
+| 5 Quotes/CRM | pipeline, timeline y generación documental | presupuestos y seguimiento |
+| 6 Sales & Logistics | venta, pricing, comisión, pagos, entrega y rentabilidad | flujo transaccional y snapshots |
+| 7 Procurement | compra mixta, proveedores, NC y cost engine | breakdown/confirmación |
+| 8 Production | BOM, consumos, outputs y costo | órdenes de producción |
+| 9 Treasury | cajas, gastos, cheques, cross-transfer y cash flow | operación financiera autorizada |
+| 10 ARCA | adapter, homologación, CAE y jobs | estados/PDF; SANDBOX antes de production readiness |
+| 11 Mercado Libre | OAuth, webhooks, sync, conciliación y workers | operación/rentabilidad por orden |
+| 12 Meta | adapters oficiales, webhooks y outbox | mensajería e historial |
+| 13 Command Center | queries/KPIs/reportes autorizados | dashboards y reportes |
+| 14 Migration | ETL selectivo/reconcile | preview de migración |
+| 15 Hardening | performance, security, DR y observabilidad | production readiness review |
 
 ## Gates transversales
 
-- Migraciones compatibles y revisadas.
-- Permisos negativos y no filtración de datos.
-- Idempotencia y auditoría en writes críticos.
-- Unit + integration + E2E proporcional al riesgo.
-- Lint/typecheck/tests/build verdes.
-- Preview aislada; adapters productivos bloqueados.
-- Estado de integración declarado con honestidad.
+- OpenAPI compatible o versionado; cliente generado sincronizado.
+- Backend nunca depende de DTOs/código frontend; frontend nunca accede a DB.
+- Permisos negativos y ausencia de campos sensibles en responses.
+- Migraciones revisadas y backward-compatible con deployments solapados.
+- Idempotencia/auditoría en writes críticos.
+- CI backend y frontend verdes; E2E contra servicios reales de preview.
+- Estado de integración declarado `MOCK`, `SANDBOX` o `PRODUCTION READY`.
 
-## Estado al cerrar FASE 0
+## Estado al cerrar esta revisión de FASE 0
 
 | Item | Estado |
 | --- | --- |
-| Arquitectura y documentación | DONE |
-| Código funcional | NOT STARTED |
+| Arquitectura separada y documentación | DONE |
+| `Ferronik-SRL_Backend` | NOT CREATED |
+| `Ferronik-SRL_Frontend` | NOT CREATED |
 | DB/migrations | NOT STARTED |
 | Tests/build | NOT APPLICABLE |
-| Vercel | NOT DEPLOYED |
+| Frontend Vercel | NOT DEPLOYED |
+| Backend Railway | NOT DEPLOYED |
